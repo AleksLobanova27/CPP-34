@@ -1,0 +1,6 @@
+# ninja log v6
+23	553	7763657686903772	build.ninja	fce959aca48d8de2
+22	1300	7763657684083354	CMakeFiles/LeaverDynamicLib.dir/Leaver.cpp.obj	260ad814e6b7763f
+133	1843	7763657685193409	CMakeFiles/LeaverExe.dir/LeaverClient.cpp.obj	1490d4a9e824c8ba
+1303	3268	7763657715533415	LeaverDynamicLib.dll	44251d324cddc495
+1303	3268	7763657715533415	LeaverDynamicLib.lib	44251d324cddc495
