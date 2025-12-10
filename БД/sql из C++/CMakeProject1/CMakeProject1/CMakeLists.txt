@@ -1,0 +1,6 @@
+﻿cmake_minimum_required(VERSION 3.20)
+project(CMakeProject1)
+add_executable(CMakeProject1 main.cpp)
+add_subdirectory(D:\СРРМ-33\БД\libpqxx\libpqxx-7.10.4 libpqxx-build)
+target_compile_features(CMakeProject1 PRIVATE cxx_std_17)
+target_link_libraries(CMakeProject1 pqxx)
