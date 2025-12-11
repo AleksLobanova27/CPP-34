@@ -1,20 +1,90 @@
-﻿// Задание 1.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
-//
-
+﻿#include <Wt/Dbo/Dbo.h>
+#include <Wt/Dbo/backend/Postgres.h>
+#include <Wt/Dbo/WtSqlTraits.h>
 #include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+using namespace std;
+namespace dbo = Wt::Dbo;
 
-int main()
-{
-    std::cout << "Hello World!\n";
-}
+class Publisher;
+class Book;
+class Shop;
+class Stock;
+class Sale;
 
-// Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
-// Отладка программы: F5 или меню "Отладка" > "Запустить отладку"
+class Publisher {
+public:
+    string name = "";
 
-// Советы по началу работы 
-//   1. В окне обозревателя решений можно добавлять файлы и управлять ими.
-//   2. В окне Team Explorer можно подключиться к системе управления версиями.
-//   3. В окне "Выходные данные" можно просматривать выходные данные сборки и другие сообщения.
-//   4. В окне "Список ошибок" можно просматривать ошибки.
-//   5. Последовательно выберите пункты меню "Проект" > "Добавить новый элемент", чтобы создать файлы кода, или "Проект" > "Добавить существующий элемент", чтобы добавить в проект существующие файлы кода.
-//   6. Чтобы снова открыть этот проект позже, выберите пункты меню "Файл" > "Открыть" > "Проект" и выберите SLN-файл.
+    dbo::collection<dbo::ptr<Book>> books;
+
+    template<class Action>
+    void persist(Action& a) {
+        dbo::field(a, name, "name");
+        dbo::hasMany(a, books, dbo::ManyToOne, "publisher");
+    }
+};
+
+class Book {
+public:
+    string title = "";
+
+    dbo::ptr<Publisher> publisher;
+    dbo::collection<dbo::ptr<Stock>> stocks;
+
+    template<class Action>
+    void persist(Action& a) {
+        dbo::field(a, title, "title");
+        dbo::belongsTo(a, publisher, "publisher");
+        dbo::hasMany(a, stocks, dbo::ManyToOne, "book");
+    }
+};
+
+class Shop {
+public:
+    string name = "";
+
+    dbo::collection<dbo::ptr<Stock>> stocks;
+
+    template<class Action>
+    void persist(Action& a) {
+        dbo::field(a, name, "name");
+        dbo::hasMany(a, stocks, dbo::ManyToOne, "shop");
+    }
+};
+
+class Stock {
+public:
+    int count = 0;
+
+    dbo::ptr<Book> book;
+    dbo::ptr<Shop> shop;
+    dbo::collection<dbo::ptr<Sale>> sales;
+
+    template<class Action>
+    void persist(Action& a) {
+        dbo::field(a, count, "count");
+        dbo::belongsTo(a, book, "book");
+        dbo::belongsTo(a, shop, "shop");
+        dbo::hasMany(a, sales, dbo::ManyToOne, "stock");
+    }
+};
+
+class Sale {
+public:
+    double price = 0.0;
+    string date_sale = "";
+    int count = 0;
+
+    dbo::ptr<Stock> stock;
+
+    template<class Action>
+    void persist(Action& a) {
+        dbo::field(a, price, "price");
+        dbo::field(a, date_sale, "date_sale");
+        dbo::field(a, count, "count");
+        dbo::belongsTo(a, stock, "stock");
+    }
+};
