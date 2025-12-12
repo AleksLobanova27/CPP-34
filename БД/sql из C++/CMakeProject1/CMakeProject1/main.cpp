@@ -2,44 +2,59 @@
 #include <string>
 #include <vector>
 #include <pqxx/pqxx>
+
 using namespace std;
 
-class ClientDB(const string& conn_str) :conn_(conn_str) {
-	// 1. Создание структуры БД
-	void create_schema() {
-		pqxx::work tx{ conn_ };
-		tx.exec(
-			"CREATE TABLE IF NOT EXISTS clients("
-			"id SERIAL PRIMARY KEY,"
-			"first_name VARCHAR(50) NOT NULL,"
-			"last_name VARCHAR(50) NOT NULL,"
-			"email VARCHAR(100) UNIQUE NOT NULL"
-			");"
-		);
-		tx.exec(
-			"CREATE TABLE IF NOT EXISTS phones("
-			"id SERIAL PRIMARY KEY,"
-			"client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,"
-			"phone VARCHAR(30) NOT NULL"
-		");"
-		);
-		tx.commit();
-	}
+// РЎС‚СЂСѓРєС‚СѓСЂР° РґР»СЏ С…СЂР°РЅРµРЅРёСЏ РґР°РЅРЅС‹С… Рѕ РєР»РёРµРЅС‚Рµ
+struct ClientData {
+    int id;
+    string first_name;
+    string last_name;
+    string email;
+    vector<string> phones;
+};
 
-	// 2. Добавить нового клиента, возвращает id
-	int add_client(const string& first, const string& last, const string& email) {
-		pqxx::work tx{ conn_ };
-		pqxx::result r = tx.exec_params(
-			"INTERT INTO clients(first_name, last_name, email)"
-			"VALUES ($1, $2, $3) RETURNING id;",
-			first, last, email);
-		int id = r[0][0].as<int>();
-		tx.commit();
-		return id;
-	}
+class ClientDB {
+public:
+    // РљРѕРЅСЃС‚СЂСѓРєС‚РѕСЂ
+    ClientDB(const string& conn_str) : conn_(conn_str) {}
+    
+    // 1. РЎРѕР·РґР°РЅРёРµ СЃС‚СЂСѓРєС‚СѓСЂС‹ Р‘Р”
+    void create_schema() {
+        pqxx::work tx{ conn_ };
+        tx.exec(
+            "CREATE TABLE IF NOT EXISTS clients("
+            "id SERIAL PRIMARY KEY,"
+            "first_name VARCHAR(50) NOT NULL,"
+            "last_name VARCHAR(50) NOT NULL,"
+            "email VARCHAR(100) UNIQUE NOT NULL"
+            ");"
+        );
+        tx.exec(
+            "CREATE TABLE IF NOT EXISTS phones("
+            "id SERIAL PRIMARY KEY,"
+            "client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,"
+            "phone VARCHAR(30) NOT NULL"
+            ");"
+        );
+        tx.commit();
+    }
 
-	// 3. Добавить телефон существующему клиенту
-	void add_phone(int client_id < const string& phone) {
+    // 2. Р”РѕР±Р°РІРёС‚СЊ РЅРѕРІРѕРіРѕ РєР»РёРµРЅС‚Р°, РІРѕР·РІСЂР°С‰Р°РµС‚ id
+    int add_client(const string& first, const string& last, const string& email) {
+        pqxx::work tx{ conn_ };
+        // РСЃРїСЂР°РІР»РµРЅРѕ: INTERT -> INSERT
+        pqxx::result r = tx.exec_params(
+            "INSERT INTO clients(first_name, last_name, email) "
+            "VALUES ($1, $2, $3) RETURNING id;",
+            first, last, email);
+        int id = r[0][0].as<int>();
+        tx.commit();
+        return id;
+    }
+
+    // 3. Р”РѕР±Р°РІРёС‚СЊ С‚РµР»РµС„РѕРЅ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РµРјСѓ РєР»РёРµРЅС‚Сѓ
+    void add_phone(int client_id, const string& phone) {
         pqxx::work tx{ conn_ };
         tx.exec_params(
             "INSERT INTO phones(client_id, phone) VALUES ($1, $2);",
@@ -48,7 +63,7 @@ class ClientDB(const string& conn_str) :conn_(conn_str) {
         tx.commit();
     }
 
-    // 4. Изменить данные о клиенте 
+    // 4. РР·РјРµРЅРёС‚СЊ РґР°РЅРЅС‹Рµ Рѕ РєР»РёРµРЅС‚Рµ 
     void update_client(int client_id,
         const string& new_first,
         const string& new_last,
@@ -77,7 +92,7 @@ class ClientDB(const string& conn_str) :conn_(conn_str) {
         tx.commit();
     }
 
-    // 5. Удалить телефон у клиента
+    // 5. РЈРґР°Р»РёС‚СЊ С‚РµР»РµС„РѕРЅ Сѓ РєР»РёРµРЅС‚Р°
     void delete_phone(int client_id, const string& phone) {
         pqxx::work tx{ conn_ };
         tx.exec_params(
@@ -87,24 +102,27 @@ class ClientDB(const string& conn_str) :conn_(conn_str) {
         tx.commit();
     }
 
-    // 6. Удалить клиента (телефоны удалятся каскадно)
+    // 6. РЈРґР°Р»РёС‚СЊ РєР»РёРµРЅС‚Р° (С‚РµР»РµС„РѕРЅС‹ СѓРґР°Р»СЏСЋС‚СЃСЏ РєР°СЃРєР°РґРЅРѕ)
     void delete_client(int client_id) {
         pqxx::work tx{ conn_ };
         tx.exec_params("DELETE FROM clients WHERE id = $1;", client_id);
         tx.commit();
     }
 
-    // 7. Поиск клиента по имени / фамилии / email / телефону
-
-    void find_client(const string& first,
-        const string& last,
-        const string& email,
-        const string& phone)
+    // 7. РџРѕРёСЃРє РєР»РёРµРЅС‚Р° РїРѕ РёРјРµРЅРё / С„Р°РјРёР»РёРё / email / С‚РµР»РµС„РѕРЅСѓ
+    // Р’РѕР·РІСЂР°С‰Р°РµС‚ РІРµРєС‚РѕСЂ РЅР°Р№РґРµРЅРЅС‹С… РєР»РёРµРЅС‚РѕРІ
+    vector<ClientData> find_client(const string& first,
+                                   const string& last,
+                                   const string& email,
+                                   const string& phone)
     {
+        vector<ClientData> result;
+        
+        // РџРµСЂРІС‹Р№ Р·Р°РїСЂРѕСЃ: РЅР°С…РѕРґРёРј ID РєР»РёРµРЅС‚РѕРІ РїРѕ РєСЂРёС‚РµСЂРёСЏРј
         pqxx::work tx{ conn_ };
 
         string sql =
-            "SELECT c.id, c.first_name, c.last_name, c.email, p.phone "
+            "SELECT DISTINCT c.id "
             "FROM clients c "
             "LEFT JOIN phones p ON c.id = p.client_id "
             "WHERE 1=1 ";
@@ -114,30 +132,67 @@ class ClientDB(const string& conn_str) :conn_(conn_str) {
         if (!email.empty()) sql += "AND c.email      = " + tx.quote(email) + " ";
         if (!phone.empty()) sql += "AND p.phone      = " + tx.quote(phone) + " ";
 
-        pqxx::result r = tx.exec(sql);
-
-        for (const auto& row : r) {
-            cout << "id=" << row["id"].as<int>()
-                << " " << row["first_name"].c_str()
-                << " " << row["last_name"].c_str()
-                << " email=" << row["email"].c_str()
-                << " phone=";
-            if (row["phone"].is_null())
-                cout << "(none)";
-            else
-                cout << row["phone"].c_str();
-            cout << endl;
+        pqxx::result client_ids = tx.exec(sql);
+        
+        // Р”Р»СЏ РєР°Р¶РґРѕРіРѕ РЅР°Р№РґРµРЅРЅРѕРіРѕ РєР»РёРµРЅС‚Р° РїРѕР»СѓС‡Р°РµРј РїРѕР»РЅС‹Рµ РґР°РЅРЅС‹Рµ
+        for (const auto& row : client_ids) {
+            int client_id = row["id"].as<int>();
+            
+            // РџРѕР»СѓС‡Р°РµРј РѕСЃРЅРѕРІРЅС‹Рµ РґР°РЅРЅС‹Рµ РєР»РёРµРЅС‚Р°
+            pqxx::result client_info = tx.exec_params(
+                "SELECT first_name, last_name, email FROM clients WHERE id = $1",
+                client_id
+            );
+            
+            ClientData client;
+            client.id = client_id;
+            client.first_name = client_info[0]["first_name"].as<string>();
+            client.last_name = client_info[0]["last_name"].as<string>();
+            client.email = client_info[0]["email"].as<string>();
+            
+            // РџРѕР»СѓС‡Р°РµРј С‚РµР»РµС„РѕРЅС‹ РєР»РёРµРЅС‚Р°
+            pqxx::result phone_info = tx.exec_params(
+                "SELECT phone FROM phones WHERE client_id = $1",
+                client_id
+            );
+            
+            for (const auto& phone_row : phone_info) {
+                client.phones.push_back(phone_row["phone"].as<string>());
+            }
+            
+            result.push_back(client);
         }
         
+        tx.commit();
+        return result;
     }
 
 private:
     pqxx::connection conn_;
 };
 
-iint main() {
+// Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ РІС‹РІРѕРґР° РґР°РЅРЅС‹С… РєР»РёРµРЅС‚Р°
+void print_client(const ClientData& client) {
+    cout << "id=" << client.id
+         << " " << client.first_name
+         << " " << client.last_name
+         << " email=" << client.email
+         << " phones: ";
+    
+    if (client.phones.empty()) {
+        cout << "(none)";
+    } else {
+        for (size_t i = 0; i < client.phones.size(); ++i) {
+            if (i > 0) cout << ", ";
+            cout << client.phones[i];
+        }
+    }
+    cout << endl;
+}
+
+int main() {
     try {
-        // строка подключения под себя
+        // СЃС‚СЂРѕРєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ РїРѕРґ СЃРµР±СЏ
         ClientDB db("host=localhost port=5432 dbname=clients_db user=postgres password=postgres");
 
         db.create_schema();
@@ -152,18 +207,27 @@ iint main() {
 
         db.update_client(id3, "", "", "anna.smirnova@example.com");
 
-        cout << "Поиск по email:\n";
-        db.find_client("", "", "ivan@example.com", "");
+        cout << "РџРѕРёСЃРє РїРѕ email:\n";
+        vector<ClientData> found = db.find_client("", "", "ivan@example.com", "");
+        for (const auto& client : found) {
+            print_client(client);
+        }
 
-        cout << "Поиск по телефону:\n";
-        db.find_client("", "", "", "+7-900-222-33-44");
+        cout << "\nРџРѕРёСЃРє РїРѕ С‚РµР»РµС„РѕРЅСѓ:\n";
+        found = db.find_client("", "", "", "+7-900-222-33-44");
+        for (const auto& client : found) {
+            print_client(client);
+        }
 
-        // пример удаления телефона и клиента
+        // РїСЂРёРјРµСЂ СѓРґР°Р»РµРЅРёСЏ С‚РµР»РµС„РѕРЅР° Рё РєР»РёРµРЅС‚Р°
         db.delete_phone(id1, "+7-900-111-22-44");
         db.delete_client(id2);
 
-        cout << "После удаления:\n";
-        db.find_client("", "", "", "");
+        cout << "\nРџРѕСЃР»Рµ СѓРґР°Р»РµРЅРёСЏ:\n";
+        found = db.find_client("", "", "", "");
+        for (const auto& client : found) {
+            print_client(client);
+        }
     }
     catch (const exception& ex) {
         cerr << "Error: " << ex.what() << endl;
